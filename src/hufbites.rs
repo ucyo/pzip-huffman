@@ -7,19 +7,33 @@ use std::cmp::Ordering;
 
 use bit_vec::BitVec;
 
-pub mod hufbites;
 
-pub fn encode(data: &str, huffman_codes: &HashMap<char, BitVec>) -> BitVec {
+pub fn encode_itself_to_bytes(data: &Vec<u8>) -> Vec<u8> {
+    let huffman_codes = get_huffman_codes(data);
+    let bitvec = encode(data, &huffman_codes);
+    bitvec.to_bytes()
+}
+
+
+pub fn decode_from_bytes(data: Vec<u8>, huffman_codes: &HashMap<u8, BitVec>, size: usize) -> Vec<u8> {
+    let bitvec = BitVec::from_bytes(&data[..]);
+    let result = decode(bitvec, huffman_codes);
+
+    result[..size].to_vec()
+}
+
+
+pub fn encode(data: &Vec<u8>, huffman_codes: &HashMap<u8, BitVec>) -> BitVec {
 
     let mut nbits = 0;
-    for c in data.chars() {
-        nbits += huffman_codes.get(&c).unwrap().len();
+    for c in data.iter() {
+        nbits += huffman_codes.get(c).unwrap().len();
     }
 
     let mut res = BitVec::with_capacity(nbits);
 
-    for c in data.chars() {
-        let bv = huffman_codes.get(&c).unwrap();
+    for c in data.iter() {
+        let bv = huffman_codes.get(c).unwrap();
         for bit in bv.iter() {
             res.push(bit);
         }
@@ -28,11 +42,11 @@ pub fn encode(data: &str, huffman_codes: &HashMap<char, BitVec>) -> BitVec {
     res
 }
 
-pub fn decode(bits: BitVec, huffman_codes: &HashMap<char, BitVec>) -> String {
+pub fn decode(bits: BitVec, huffman_codes: &HashMap<u8, BitVec>) -> Vec<u8> {
 
     let hci = invert_huffman_codes(huffman_codes);
 
-    let mut res = String::new();
+    let mut res : Vec<u8> = Vec::new();
     let mut bv = BitVec::new();
 
     for bit in bits.iter() {
@@ -46,19 +60,19 @@ pub fn decode(bits: BitVec, huffman_codes: &HashMap<char, BitVec>) -> String {
     res
 }
 
-fn get_char_counts(data: &str) -> HashMap<char, i32> {
+fn get_bytes_counts(data: &Vec<u8>) -> HashMap<u8, i32> {
 
     let mut char_counts = HashMap::new();
 
-    for c in data.chars() {
-        let count = char_counts.entry(c).or_insert(0);
+    for c in data.iter() {
+        let count = char_counts.entry(*c).or_insert(0);
         *count += 1;
     }
 
     char_counts
 }
 
-fn heapify(map: HashMap<char, i32>) -> BinaryHeap<Box<Tree>> {
+fn heapify(map: HashMap<u8, i32>) -> BinaryHeap<Box<Tree>> {
 
     let mut heap = BinaryHeap::new();
 
@@ -82,9 +96,9 @@ fn create_huffman_tree(mut heap: BinaryHeap<Box<Tree>>) -> Box<Tree> {
     heap.pop().unwrap()
 }
 
-pub fn get_huffman_codes(data: &str) -> HashMap<char, BitVec> {
+pub fn get_huffman_codes(data: &Vec<u8>) -> HashMap<u8, BitVec> {
 
-    let char_counts = get_char_counts(data);
+    let char_counts = get_bytes_counts(data);
 
     let heap = heapify(char_counts);
 
@@ -93,7 +107,7 @@ pub fn get_huffman_codes(data: &str) -> HashMap<char, BitVec> {
     return huffman_codes_from_tree(&Some(ht), BitVec::new(), HashMap::new());
 }
 
-fn invert_huffman_codes(codes: &HashMap<char, BitVec>) -> HashMap<BitVec, char> {
+fn invert_huffman_codes(codes: &HashMap<u8, BitVec>) -> HashMap<BitVec, u8> {
 
     let mut res = HashMap::new();
 
@@ -104,7 +118,7 @@ fn invert_huffman_codes(codes: &HashMap<char, BitVec>) -> HashMap<BitVec, char> 
     res
 }
 
-fn huffman_codes_from_tree(opt: &Option<Box<Tree>>, prefix: BitVec, mut map: HashMap<char, BitVec>) -> HashMap<char, BitVec> {
+fn huffman_codes_from_tree(opt: &Option<Box<Tree>>, prefix: BitVec, mut map: HashMap<u8, BitVec>) -> HashMap<u8, BitVec> {
 
     if let Some(ref tree) = *opt {
         match tree.value {
@@ -130,24 +144,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn char_counts_simple_string() {
-        let a = "abcdeabaccaaaaa";
+    fn byte_counts_simple_string() {
+        let a : Vec<u8> = vec![1,2,3,4,5,1,2,1,3,3,1,1,1,1,1];
 
-        let res_fn = get_char_counts(a);
-        let res: HashMap<_, _> = a.chars().zip(vec![8, 2, 3, 1, 1]).collect();
+        let res_fn = get_bytes_counts(&a);
+        let res: HashMap<_, _> = a.into_iter().zip(vec![8, 2, 3, 1, 1]).collect();
 
         assert_eq!(res_fn, res);
     }
 
     #[test]
     fn decoding_is_inverse() {
-        let s = "abcdeabaccaaaaa";
+        let s : Vec<u8> = vec![1,2,3,4,5,1,2,1,3,3,1,1,1,1,1];
 
-        let hc = get_huffman_codes(s);
+        let hc = get_huffman_codes(&s);
 
-        let s2 = "babbc";
+        // let s2 = "babbc";
+        let s2 : Vec<u8> = vec![2,1,2,2,3];
 
-        let encoded = encode(s2, &hc);
+        let encoded = encode(&s2, &hc);
         let decoded = decode(encoded, &hc);
 
         assert_eq!(s2, decoded);
@@ -157,7 +172,7 @@ mod tests {
 #[derive(Eq, Debug, Clone)]
 struct Tree {
     count: i32,
-    value: Option<char>,
+    value: Option<u8>,
     left: Option<Box<Tree>>,
     right: Option<Box<Tree>>,
 }
@@ -182,7 +197,7 @@ impl PartialEq for Tree {
 
 impl Tree {
 
-    fn new(value: char, count: i32) -> Box<Tree> {
+    fn new(value: u8, count: i32) -> Box<Tree> {
         let t = Tree {
             count,
             value: Some(value),
