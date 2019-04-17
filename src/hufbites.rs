@@ -143,6 +143,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fix_no_output_by_single_values() {
+        let a : Vec<u8> = vec![4,4,4,4,4,4,4,4,4,4,4,4,4];
+        let codes = get_huffman_codes(&a);
+        let encode = encode(&a, &codes);
+        assert_ne!(encode.to_bytes(), Vec::<u8>::new());
+    }
+
+    #[test]
     fn byte_counts_simple_string() {
         let a : Vec<u8> = vec![1,2,3,4,5,1,2,1,3,3,1,1,1,1,1];
 
