@@ -96,14 +96,18 @@ fn create_huffman_tree(mut heap: BinaryHeap<Box<Tree>>) -> Box<Tree> {
 }
 
 pub fn get_huffman_codes(data: &Vec<u8>) -> HashMap<u8, BitVec> {
+    let mut bv = BitVec::new();
 
     let char_counts = get_bytes_counts(data);
+    if char_counts.len() <= 1 {
+        bv.push(false);
+    }
 
     let heap = heapify(char_counts);
 
     let ht = create_huffman_tree(heap);
 
-    return huffman_codes_from_tree(&Some(ht), BitVec::new(), HashMap::new());
+    return huffman_codes_from_tree(&Some(ht), bv, HashMap::new());
 }
 
 fn invert_huffman_codes(codes: &HashMap<u8, BitVec>) -> HashMap<BitVec, u8> {
