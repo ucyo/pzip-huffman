@@ -6,6 +6,17 @@ use std::cmp::Ordering;
 
 use bit_vec::BitVec;
 
+pub fn adaptive_encode_to_bytes(data: &Vec<u8>) -> Vec<u8> {
+    let mut bv = BitVec::new();
+    for i in 0..data.len() {
+        let huffman_codes = get_huffman_codes(&data[..i+1].to_vec());
+        let b = huffman_codes.get(&data[i]).unwrap();
+        for bit in b {
+            bv.push(bit)
+        }
+    }
+    bv.to_bytes()
+}
 
 pub fn encode_itself_to_bytes(data: &Vec<u8>) -> Vec<u8> {
     let huffman_codes = get_huffman_codes(data);
