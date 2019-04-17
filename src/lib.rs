@@ -1,6 +1,4 @@
-/// TODO: Must be changed to accept Vec<uint8>
-/// TODO: bit-vec is deprecated
-/// TODO: Huffman codes not consistent, if the number of occurences is the same
+/// Original code from https://github.com/jalexvig/comprustion
 
 use std::collections::{HashMap, BinaryHeap};
 use std::cmp::Ordering;
