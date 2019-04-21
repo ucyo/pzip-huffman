@@ -3,7 +3,8 @@
 
 use std::collections::{HashMap, BinaryHeap};
 use std::cmp::Ordering;
-
+use log::debug;
+use std::collections::BTreeMap;
 use bit_vec::BitVec;
 
 pub fn adaptive_encode_to_bytes(data: &Vec<u8>) -> Vec<u8> {
@@ -114,12 +115,107 @@ pub fn get_huffman_codes(data: &Vec<u8>) -> HashMap<u8, BitVec> {
         bv.push(false);
     }
 
-    let heap = heapify(char_counts);
-
+    let heap = heapify(char_counts.clone());
     let ht = create_huffman_tree(heap);
 
-    return huffman_codes_from_tree(&Some(ht), bv, HashMap::new());
+    // test
+    let _ = get_merged_huffman_codes(data);
+
+    huffman_codes_from_tree(&Some(ht), bv, HashMap::new())
 }
+
+
+pub fn get_merged_huffman_codes(data: &Vec<u8>)  -> (HashMap<u8, BitVec>, HashMap<u8,u8>) {
+
+    // calculate once
+    let mut bv = BitVec::new();
+
+    let mut char_counts = get_bytes_counts(data);
+    if char_counts.len() <= 1 {
+        bv.push(false);
+    }
+
+    let heap = heapify(char_counts.clone());
+    let ht = create_huffman_tree(heap);
+    let result = huffman_codes_from_tree(&Some(ht), bv, HashMap::new());
+    debug!("Codebook 1: {:?}", result);
+    let mappings = check_saving(&result, &char_counts);
+
+    // remap values and update char_counts
+    for (old,new) in mappings.iter() {
+        let old_count = char_counts.get(old).unwrap();
+        char_counts.insert(*new, char_counts.get(new).unwrap() + old_count);
+        char_counts.remove(old).unwrap();
+    }
+
+    // redo
+    let mut bv = BitVec::new();
+    if char_counts.len() <= 1 {
+        bv.push(false);
+    }
+    let heap = heapify(char_counts.clone());
+    let ht = create_huffman_tree(heap);
+    let mut result = huffman_codes_from_tree(&Some(ht), bv, HashMap::new());
+
+    // add mapped LZCs to codebook
+    for m in mappings.iter() {
+        let code = result.get(m.1).unwrap();
+        let mut new_bv = BitVec::new();
+        for b in code.iter() {
+            new_bv.push(b == true);
+        }
+        result.insert(*m.0, new_bv);
+    }
+    debug!("Codebook 2: {:?}", result);
+
+    (result, mappings)
+}
+
+
+fn check_saving(huffman_codes: &HashMap<u8, BitVec>, counts: &HashMap<u8, i32>) -> HashMap<u8, u8>{
+    let threshold = 8i32;
+    debug!("Codebook: {:?}", huffman_codes);
+    let cl : BTreeMap<_,_> = huffman_codes.iter().map(|(&k,v)| (k,v.len())).collect();
+    debug!("Element & Codelength: {:?}", cl);
+    let co : BTreeMap<_,_> = counts.iter().collect();
+    debug!("Element & Counts: {:?}", co);
+
+    let mut savings : HashMap<(u8,u8), i32> = HashMap::new();
+    // calculate potential saving by comparing every element with every other
+    let elements: Vec<u8> = cl.keys().cloned().collect();
+    debug!("All elements: {:?}", elements);
+    for i in 0..elements.len() {
+        let x = elements[i];
+        for j in i..elements.len() {
+            let y = elements[j];
+            if x >= y {
+                continue
+            }
+            let saving : i32 = (*cl.get(&y).unwrap() as i32 + y as i32 - x as i32 - *cl.get(&x).unwrap() as i32) * **co.get(&x).unwrap();
+            if saving < 0 {
+                savings.insert((x as u8, y as u8), saving);
+            }
+        }
+    }
+    debug!("Potential savings: {:?}", savings);
+
+    // Sorting from smallest saving gain to biggest
+    let mut sorted : Vec<(_,_)> = savings.into_iter().collect();
+    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    // debug!("{:?}", sorted);
+
+    let mut result : HashMap<u8, u8> = HashMap::new();
+    for save in sorted.into_iter() {
+        let mapping = save.0;
+        if save.1.abs() < threshold {
+            continue
+        }
+        result.insert(mapping.0, mapping.1);
+    }
+    debug!("Savings: {:?}", result);
+    result
+}
+
 
 fn invert_huffman_codes(codes: &HashMap<u8, BitVec>) -> HashMap<BitVec, u8> {
 
