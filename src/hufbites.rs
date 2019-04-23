@@ -1,9 +1,10 @@
 /// TODO: bit-vec is deprecated
 /// TODO: Huffman codes not consistent, if the number of occurences is the same
+/// TODO: Rename merged_huffman to numerical_huffman
 
 use std::collections::{HashMap, BinaryHeap};
 use std::cmp::Ordering;
-use log::debug;
+use log::{debug, warn, info};
 use std::collections::BTreeMap;
 use bit_vec::BitVec;
 
@@ -18,6 +19,13 @@ pub fn adaptive_encode_to_bytes(data: &Vec<u8>) -> Vec<u8> {
     }
     bv.to_bytes()
 }
+
+pub fn encode_itself_by_merged_huffman_to_bytes(data: &Vec<u8>) -> (Vec<u8>, HashMap<u8,u8>) {
+    let (huffman_codes, mappings) = get_merged_huffman_codes(data);
+    let bitvec = encode(data, &huffman_codes);
+    (bitvec.to_bytes(), mappings)
+}
+
 
 pub fn encode_itself_to_bytes(data: &Vec<u8>) -> Vec<u8> {
     let huffman_codes = get_huffman_codes(data);
@@ -118,9 +126,6 @@ pub fn get_huffman_codes(data: &Vec<u8>) -> HashMap<u8, BitVec> {
     let heap = heapify(char_counts.clone());
     let ht = create_huffman_tree(heap);
 
-    // test
-    let _ = get_merged_huffman_codes(data);
-
     huffman_codes_from_tree(&Some(ht), bv, HashMap::new())
 }
 
@@ -173,7 +178,7 @@ pub fn get_merged_huffman_codes(data: &Vec<u8>)  -> (HashMap<u8, BitVec>, HashMa
 
 
 fn check_saving(huffman_codes: &HashMap<u8, BitVec>, counts: &HashMap<u8, i32>) -> HashMap<u8, u8>{
-    let threshold = 8i32;
+    let threshold = 0i32;
     debug!("Codebook: {:?}", huffman_codes);
     let cl : BTreeMap<_,_> = huffman_codes.iter().map(|(&k,v)| (k,v.len())).collect();
     debug!("Element & Codelength: {:?}", cl);
@@ -185,24 +190,23 @@ fn check_saving(huffman_codes: &HashMap<u8, BitVec>, counts: &HashMap<u8, i32>) 
     let elements: Vec<u8> = cl.keys().cloned().collect();
     debug!("All elements: {:?}", elements);
     for i in 0..elements.len() {
-        let x = elements[i];
+        let x = elements[elements.len()-i-1];
         for j in i..elements.len() {
-            let y = elements[j];
-            if x >= y {
+            let y = elements[elements.len()-1-j];
+            if x <= y {
                 continue
             }
-            let saving : i32 = (*cl.get(&y).unwrap() as i32 + y as i32 - x as i32 - *cl.get(&x).unwrap() as i32) * **co.get(&x).unwrap();
+            let saving : i32 = (*cl.get(&y).unwrap() as i32 + x as i32 - y as i32 - *cl.get(&x).unwrap() as i32) * **co.get(&x).unwrap();
             if saving < 0 {
                 savings.insert((x as u8, y as u8), saving);
             }
         }
     }
     debug!("Potential savings: {:?}", savings);
-
     // Sorting from smallest saving gain to biggest
     let mut sorted : Vec<(_,_)> = savings.into_iter().collect();
     sorted.sort_by(|a, b| b.1.cmp(&a.1));
-    // debug!("{:?}", sorted);
+    debug!("Sorted: {:?}", sorted);
 
     let mut result : HashMap<u8, u8> = HashMap::new();
     for save in sorted.into_iter() {
