@@ -119,6 +119,7 @@ pub fn get_huffman_codes(data: &Vec<u8>) -> HashMap<u8, BitVec> {
     let mut bv = BitVec::new();
 
     let char_counts = get_bytes_counts(data);
+    debug!("Huffman Counts: {:?}", char_counts);
     if char_counts.len() <= 1 {
         bv.push(false);
     }
@@ -126,7 +127,9 @@ pub fn get_huffman_codes(data: &Vec<u8>) -> HashMap<u8, BitVec> {
     let heap = heapify(char_counts.clone());
     let ht = create_huffman_tree(heap);
 
-    huffman_codes_from_tree(&Some(ht), bv, HashMap::new())
+    let result = huffman_codes_from_tree(&Some(ht), bv, HashMap::new());
+    debug!("Huffman Codes: {:?}", result);
+    result
 }
 
 
