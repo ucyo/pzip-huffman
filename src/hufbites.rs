@@ -27,10 +27,10 @@ pub fn encode_itself_by_merged_huffman_to_bytes(data: &Vec<u8>) -> (Vec<u8>, Has
 }
 
 
-pub fn encode_itself_to_bytes(data: &Vec<u8>) -> Vec<u8> {
+pub fn encode_itself_to_bytes(data: &Vec<u8>) -> (Vec<u8>, HashMap<u8, BitVec>) {
     let huffman_codes = get_huffman_codes(data);
     let bitvec = encode(data, &huffman_codes);
-    bitvec.to_bytes()
+    (bitvec.to_bytes(), huffman_codes)
 }
 
 
