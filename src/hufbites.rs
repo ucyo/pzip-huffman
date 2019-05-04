@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, BinaryHeap};
 use std::cmp::Ordering;
-use log::{debug, warn, info};
+use log::{debug};
 use std::collections::BTreeMap;
 use bit_vec::BitVec;
 
